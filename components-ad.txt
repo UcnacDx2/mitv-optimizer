@@ -1,0 +1,8 @@
+com.mitv.tvhome/com.mitv.tvhome.ads.floatad.FloatAdActivity
+com.mitv.tvhome/com.mitv.tvhome.ads.wakeupad.WakeUpAdActivity
+com.mitv.tvhome/com.mitv.tvhome.receiver.PushDialogReceiver
+com.mitv.tvhome/com.mitv.tvhome.ads.pushad.PushAdReceiver
+com.mitv.tvhome/com.mitv.tvhome.ads.utils.AdEventTracker
+com.mitv.tvhome/com.mitv.tvhome.ads.alarmcare.AlarmCareReceiver
+com.mitv.tvhome/com.mitv.tvhome.snapup.ui.SnapUpActivity
+com.xiaomi.mitv.appstore/com.xiaomi.ad.internal.server.AdReceiver

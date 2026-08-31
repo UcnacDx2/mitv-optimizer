@@ -1,0 +1,6 @@
+id=mitv-optimizer
+name=MiTV Optimizer
+version=v0.1.0
+versionCode=10
+author=NIRAWORK contributors
+description=Systemless MiTV launcher integration, OTA/ad controls, hosts filtering, and Android TV settings entry

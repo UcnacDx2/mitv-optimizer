@@ -1,0 +1,8 @@
+dist/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Local diagnostic captures are not publication artifacts.
+diagnostics/
