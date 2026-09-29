@@ -12,7 +12,7 @@ cmd package resolve-activity --brief \
   -c android.intent.category.HOME 2>/dev/null | tail -n 1
 echo "packages:"
 for pkg in \
-  com.dangbei1.tvlauncher \
+  com.dangbei1.tvlauncherx \
   com.ucnacdx2.mitvhomebridge \
   com.xiaomi.mitv.upgrade; do
   pm path "$pkg" 2>/dev/null | head -n 1

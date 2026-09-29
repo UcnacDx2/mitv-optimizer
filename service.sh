@@ -137,7 +137,7 @@ fi
 
 if [ "$(read_option PREFER_DANGBEI_HOME)" = "1" ]; then
   run_retry_logged /system/bin/cmd package set-home-activity --user 0 \
-    com.dangbei1.tvlauncher/com.dangbei.launcher.ui.main.MainActivity
+    com.dangbei1.tvlauncherx/com.dangbei.launcher.ui.main.MainActivity
   sleep 2
 fi
 
@@ -175,7 +175,7 @@ resolved_home="$(cmd package resolve-activity --brief \
   -a android.intent.action.MAIN \
   -c android.intent.category.HOME 2>/dev/null | tail -n 1)"
 case "$resolved_home" in
-  com.dangbei1.tvlauncher/*)
+  com.dangbei1.tvlauncherx/*)
     if [ "$(read_option DISABLE_FALLBACK_HOME)" = "1" ]; then
       disable_component \
         com.xiaomi.mitv.settings/com.xiaomi.mitv.settings.entry.FallbackHome

@@ -44,7 +44,7 @@ try {
 
     $artifactInputs = @(
         @{ Name = 'mitv-home-bridge.apk'; Path = $BridgeApk },
-        @{ Name = 'com.dangbei1.tvlauncher.apk'; Path = $DangbeiApk }
+        @{ Name = 'com.dangbei1.tvlauncherx.apk'; Path = $DangbeiApk }
     )
     $artifactDir = Join-Path $stage 'artifacts'
     New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -72,21 +72,21 @@ try {
         } else {
             $packageName = switch ($artifact.Name) {
                 'mitv-home-bridge.apk' { 'com.ucnacdx2.mitvhomebridge' }
-                'com.dangbei1.tvlauncher.apk' { 'com.dangbei1.tvlauncher' }
+                'com.dangbei1.tvlauncherx.apk' { 'com.dangbei1.tvlauncherx' }
             }
             $versionCode = switch ($artifact.Name) {
                 'mitv-home-bridge.apk' { '2' }
-                'com.dangbei1.tvlauncher.apk' { '83' }
+                'com.dangbei1.tvlauncherx.apk' { '83' }
             }
             $versionName = switch ($artifact.Name) {
                 'mitv-home-bridge.apk' { '0.2.0' }
-                'com.dangbei1.tvlauncher.apk' { '3.3.6' }
+                'com.dangbei1.tvlauncherx.apk' { '3.3.6' }
             }
             Write-Warning "Android Build Tools unavailable; using pinned metadata for $($artifact.Name)."
         }
         $expectedPackage = switch ($artifact.Name) {
             'mitv-home-bridge.apk' { 'com.ucnacdx2.mitvhomebridge' }
-            'com.dangbei1.tvlauncher.apk' { 'com.dangbei1.tvlauncher' }
+            'com.dangbei1.tvlauncherx.apk' { 'com.dangbei1.tvlauncherx' }
         }
         if ($packageName -ne $expectedPackage) {
             throw "$($artifact.Name) has package $packageName; expected $expectedPackage"
@@ -103,7 +103,7 @@ try {
         } else {
             $signerSha256 = switch ($artifact.Name) {
                 'mitv-home-bridge.apk' { '40e41572eef92a86eed5b9afffd4ccd4a7e6e86de34c3b6d2fa614f60cbe7d8c' }
-                'com.dangbei1.tvlauncher.apk' { '40e41572eef92a86eed5b9afffd4ccd4a7e6e86de34c3b6d2fa614f60cbe7d8c' }
+                'com.dangbei1.tvlauncherx.apk' { '40e41572eef92a86eed5b9afffd4ccd4a7e6e86de34c3b6d2fa614f60cbe7d8c' }
             }
         }
         $Matches = @{}

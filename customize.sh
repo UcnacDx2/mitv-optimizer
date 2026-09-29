@@ -44,11 +44,11 @@ install_or_capture_package() {
 
 # Capture installed proprietary applications instead of redistributing them.
 install_or_capture_package \
-  com.dangbei1.tvlauncher \
+  com.dangbei1.tvlauncherx \
   "$MODPATH/system/priv-app/DangBeiTVLauncher" \
   "Dangbei launcher" \
   "$SYSTEMIZE_DANGBEI" \
-  "com.dangbei1.tvlauncher.apk"
+  "com.dangbei1.tvlauncherx.apk"
 
 install_or_capture_package \
   com.ucnacdx2.mitvhomebridge \

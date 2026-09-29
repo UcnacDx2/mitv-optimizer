@@ -589,6 +589,7 @@
 0.0.0.0 applovin.com
 0.0.0.0 apps.buzzcity.net
 0.0.0.0 apps.mobilityware.com
+# Block MiTV Package Installer remote pi_config refresh (including source blacklist updates).
 0.0.0.0 appstore-upgrade.tv.mi.com
 0.0.0.0 appuu.cn
 0.0.0.0 aqyad.com
