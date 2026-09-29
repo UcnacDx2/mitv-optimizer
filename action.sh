@@ -13,7 +13,6 @@ cmd package resolve-activity --brief \
 echo "packages:"
 for pkg in \
   com.dangbei1.tvlauncher \
-  com.example.tvsettingslauncher \
   com.ucnacdx2.mitvhomebridge \
   com.xiaomi.mitv.upgrade; do
   pm path "$pkg" 2>/dev/null | head -n 1
