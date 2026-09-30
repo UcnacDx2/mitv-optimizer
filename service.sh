@@ -39,6 +39,18 @@ read_option() {
   [ -n "$option_value" ] && printf '%s' "$option_value" || printf '0'
 }
 
+enable_adb_tcp() {
+  local port
+  port="$(read_option ADB_TCP_PORT)"
+  case "$port" in
+    ''|*[!0-9]*) log "invalid ADB TCP port: $port"; return 1 ;;
+  esac
+  /system/bin/setprop persist.adb.tcp.port "$port" 2>/dev/null || true
+  /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
+  /system/bin/setprop ctl.restart adbd 2>/dev/null || true
+  log "requested ADB TCP listener on port $port"
+}
+
 component_state() {
   local comp pkg class state
   comp="$1"
@@ -129,16 +141,8 @@ done
 sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
 
-if [ ! -f "$STATE_DIR/home.before" ]; then
-  cmd package resolve-activity --brief \
-    -a android.intent.action.MAIN \
-    -c android.intent.category.HOME 2>/dev/null | tail -n 1 > "$STATE_DIR/home.before"
-fi
-
-if [ "$(read_option PREFER_DANGBEI_HOME)" = "1" ]; then
-  run_retry_logged /system/bin/cmd package set-home-activity --user 0 \
-    com.dangbei1.tvlauncherx/com.dangbei.launcher.ui.main.MainActivity
-  sleep 2
+if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
+  enable_adb_tcp
 fi
 
 if [ "$(read_option DISABLE_AD_COMPONENTS)" = "1" ]; then
@@ -170,24 +174,4 @@ if [ "$(read_option APPLY_AD_SETTINGS)" = "1" ]; then
   apply_setting system personalized_recommendation 0
 fi
 
-# FallbackHome is disabled only when a known third-party Home is actually resolved.
-resolved_home="$(cmd package resolve-activity --brief \
-  -a android.intent.action.MAIN \
-  -c android.intent.category.HOME 2>/dev/null | tail -n 1)"
-case "$resolved_home" in
-  com.dangbei1.tvlauncherx/*)
-    if [ "$(read_option DISABLE_FALLBACK_HOME)" = "1" ]; then
-      disable_component \
-        com.xiaomi.mitv.settings/com.xiaomi.mitv.settings.entry.FallbackHome
-    fi
-    if [ "$(read_option DISABLE_FACTORY_HOME)" = "1" ]; then
-      disable_component \
-        com.mitv.tvhome/com.mitv.tvhome.MainActivityUserMode
-    fi
-    ;;
-  *)
-    log "home safety guard: skipped Home component changes; resolved=$resolved_home"
-    ;;
-esac
-
-log "service complete: resolved_home=$resolved_home"
+log "service complete: Home ownership remains with mitv-home-bridge"
