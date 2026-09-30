@@ -46,6 +46,20 @@
 
 功能开关位于 `options.conf`。默认仅禁用 `FallbackHome`，不禁用原厂主 Home。修改后重启生效。
 
+### 无线 ADB 监测实现注意事项
+
+无线 ADB 由 `service.sh` 在系统启动完成后启动独立的 `adb-monitor.sh`。监测器检查
+`init.svc.adbd` 和 `service.adb.tcp.port`；发现 `adbd` 停止或端口不是配置值时，会记录
+日志并在同一脚本内重新设置 `persist.adb.tcp.port`、`service.adb.tcp.port`，然后执行
+`stop adbd` 和 `start adbd`。监测器使用 `setsid`/`nohup` 脱离服务脚本生命周期，并用 PID
+文件避免重复启动。
+
+目标电视的 Android `sh` 不会自动忽略配置文件中的 CRLF。`options.conf` 若带有回车，
+例如 `ENABLE_ADB_TCP=1\r`，字符串比较会失败，表现为服务日志显示已完成但监测器从未启动。
+构建前应保持模块脚本和配置为 Unix LF；配置读取也会显式移除 `\r`。回测不能只看手动
+重新连接后的 5555，必须在电视未手动开启 ADB 时观察重启后的自动连接和
+`/data/adb/mitv-optimizer/optimizer.log`。
+
 ## 回滚
 
 优先从 Magisk App 禁用模块并重启。确认电视恢复后再卸载。卸载脚本会恢复记录到的组件、OTA 包、广告设置和原 Home。

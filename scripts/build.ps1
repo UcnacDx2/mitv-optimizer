@@ -42,7 +42,7 @@ try {
     # copying the whole tree makes an invalid/oversized module ZIP.
     $moduleFiles = @(
         'module.prop', 'customize.sh', 'service.sh', 'action.sh',
-        'uninstall.sh', 'options.conf', 'components-ad.txt', 'system.prop'
+        'uninstall.sh', 'adb-monitor.sh', 'options.conf', 'components-ad.txt', 'system.prop'
     )
     foreach ($name in $moduleFiles) {
         $source = Join-Path $projectRoot $name

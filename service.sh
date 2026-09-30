@@ -35,7 +35,7 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
 read_option() {
   local option_key option_value
   option_key="$1"
-  option_value="$(sed -n "s/^${option_key}=//p" "$MODDIR/options.conf" | tail -n 1)"
+  option_value="$(sed -n "s/^${option_key}=//p" "$MODDIR/options.conf" | tail -n 1 | tr -d '\r')"
   [ -n "$option_value" ] && printf '%s' "$option_value" || printf '0'
 }
 
@@ -129,20 +129,15 @@ done
 sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
 
-enable_adb_tcp_after_boot() {
+monitor_adb_tcp() {
   local port
   port="$(read_option ADB_TCP_PORT)"
-  sleep 15
-  /system/bin/settings put global adb_enabled 1 2>/dev/null || true
-  /system/bin/setprop persist.adb.tcp.port "$port" 2>/dev/null || true
-  /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
-  /system/bin/stop adbd 2>/dev/null || true
-  /system/bin/start adbd 2>/dev/null || true
-  log "ADB post-boot settings applied; adbd restarted synchronously"
+  /system/bin/setsid /system/bin/nohup "$MODDIR/adb-monitor.sh" "$STATE_DIR" "$port" \
+    >/dev/null 2>&1 < /dev/null &
 }
 
 if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
-  enable_adb_tcp_after_boot &
+  monitor_adb_tcp &
 fi
 
 if [ "$(read_option DISABLE_AD_COMPONENTS)" = "1" ]; then
