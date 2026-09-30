@@ -35,12 +35,25 @@ $hasMetadataTools = (-not [string]::IsNullOrWhiteSpace($Aapt)) -and (-not [strin
 
 New-Item -ItemType Directory -Force -Path $stage, $OutputDirectory | Out-Null
 try {
-    Get-ChildItem -LiteralPath $projectRoot -Force |
-        Where-Object {
-            $_.Name -notin @('.git', 'dist') -and
-            $_.Extension -notin @('.db', '.sqlite', '.sqlite3')
-        } |
-        Copy-Item -Destination $stage -Recurse -Force
+    # Only stage files that belong in a Magisk module. The repository also
+    # contains PoC captures, decompiler output, and recovery installer files;
+    # copying the whole tree makes an invalid/oversized module ZIP.
+    $moduleFiles = @(
+        'module.prop', 'customize.sh', 'service.sh', 'action.sh',
+        'uninstall.sh', 'options.conf', 'components-ad.txt', 'system.prop'
+    )
+    foreach ($name in $moduleFiles) {
+        $source = Join-Path $projectRoot $name
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $stage $name) -Force
+        }
+    }
+    foreach ($directory in @('system')) {
+        $source = Join-Path $projectRoot $directory
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $stage $directory) -Recurse -Force
+        }
+    }
 
     $artifactInputs = @(
         @{ Name = 'mitv-home-bridge.apk'; Path = $BridgeApk },
