@@ -3,13 +3,15 @@ param(
     [string]$BridgeApk = (Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts\mitv-home-bridge.apk'),
     [string]$DangbeiApk,
     [string]$Aapt,
-    [string]$ApkSigner
+    [string]$ApkSigner,
+    [switch]$Poc
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stage = Join-Path $env:TEMP ('mitv-optimizer-' + [guid]::NewGuid().ToString('N'))
-$zip = Join-Path $OutputDirectory 'mitv-optimizer-v0.1.0.zip'
+$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.1.0.zip' }
+$zip = Join-Path $OutputDirectory $zipName
 
 if ([string]::IsNullOrWhiteSpace($Aapt)) {
     if ($env:ANDROID_BUILD_TOOLS) {
@@ -48,17 +50,22 @@ try {
             Copy-Item -LiteralPath $source -Destination (Join-Path $stage $name) -Force
         }
     }
+    if ($Poc) {
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'poc\customize-poc.sh') `
+            -Destination (Join-Path $stage 'customize.sh') -Force
+    }
     foreach ($directory in @('system')) {
+        if ($Poc) { continue }
         $source = Join-Path $projectRoot $directory
         if (Test-Path -LiteralPath $source) {
             Copy-Item -LiteralPath $source -Destination (Join-Path $stage $directory) -Recurse -Force
         }
     }
 
-    $artifactInputs = @(
+    $artifactInputs = if ($Poc) { @() } else { @(
         @{ Name = 'mitv-home-bridge.apk'; Path = $BridgeApk },
         @{ Name = 'com.dangbei1.tvlauncherx.apk'; Path = $DangbeiApk }
-    )
+    ) }
     $artifactDir = Join-Path $stage 'artifacts'
     New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
     $manifestLines = New-Object System.Collections.Generic.List[string]
