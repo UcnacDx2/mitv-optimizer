@@ -130,21 +130,13 @@ sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
 
 enable_adb_tcp_after_boot() {
-  local port attempt
+  local port
   port="$(read_option ADB_TCP_PORT)"
   sleep 15
   /system/bin/settings put global adb_enabled 1 2>/dev/null || true
-  /system/bin/settings put global adb_wifi_enabled 1 2>/dev/null || true
   /system/bin/resetprop service.adb.tcp.port "$port" 2>/dev/null || \
     /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
-  log "ADB post-boot configuration applied; restarting adbd detached"
-  (
-    /system/bin/sleep 2
-    /system/bin/stop adbd 2>/dev/null || true
-    /system/bin/sleep 2
-    /system/bin/start adbd 2>/dev/null || true
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ADB detached restart requested" >> "$LOG_FILE"
-  ) </dev/null >/dev/null 2>&1 &
+  log "ADB post-boot settings applied without restarting adbd"
 }
 
 if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
