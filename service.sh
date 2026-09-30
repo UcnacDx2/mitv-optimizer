@@ -45,10 +45,31 @@ enable_adb_tcp() {
   case "$port" in
     ''|*[!0-9]*) log "invalid ADB TCP port: $port"; return 1 ;;
   esac
-  /system/bin/setprop persist.adb.tcp.port "$port" 2>/dev/null || true
+  current="$(/system/bin/getprop service.adb.tcp.port 2>/dev/null)"
+  if [ "$current" = "$port" ]; then
+    log "ADB TCP property already set to $port; leaving adbd running"
+  else
+    /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
+    log "set ADB TCP property to $port; adbd restart deferred until port check"
+  fi
+}
+
+repair_adb_tcp_if_needed() {
+  local port
+  port="$(read_option ADB_TCP_PORT)"
+  if ! command -v /system/bin/netstat >/dev/null 2>&1; then
+    log "netstat unavailable; skipping ADB TCP repair"
+    return 0
+  fi
+  if /system/bin/netstat -ltn 2>/dev/null | /system/bin/grep -q "[:.]$port "; then
+    log "ADB TCP port $port is listening"
+    return 0
+  fi
+  log "ADB TCP port $port is not listening; restarting adbd once"
   /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
-  /system/bin/setprop ctl.restart adbd 2>/dev/null || true
-  log "requested ADB TCP listener on port $port"
+  /system/bin/stop adbd 2>/dev/null || true
+  /system/bin/sleep 1
+  /system/bin/start adbd 2>/dev/null || true
 }
 
 component_state() {
@@ -143,6 +164,7 @@ log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build
 
 if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
   enable_adb_tcp
+  repair_adb_tcp_if_needed
 fi
 
 if [ "$(read_option DISABLE_AD_COMPONENTS)" = "1" ]; then
