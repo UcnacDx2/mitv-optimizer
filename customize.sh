@@ -6,7 +6,12 @@ ui_print "*******************************"
 ui_print "       MiTV Optimizer"
 ui_print "*******************************"
 
-$BOOTMODE || abort "Install from the Magisk app after Android has booted"
+# The module is also installed through `magisk --install-module` over ADB.
+# That path does not populate BOOTMODE, but it is a valid booted installation
+# and must still run the capture/configuration and permission setup below.
+if [ "$BOOTMODE" = "false" ]; then
+  ui_print "- Recovery-style install: bundled APK/config only"
+fi
 
 install_or_capture_package() {
   pkg="$1"
