@@ -13,6 +13,11 @@ if [ "$BOOTMODE" = "false" ]; then
   ui_print "- Recovery-style install: bundled APK/config only"
 fi
 
+# Windows-built ZIPs do not carry Unix execute bits. Fix the hook scripts
+# before any optional APK capture can fail or terminate customization.
+chmod 0755 "$MODPATH/service.sh" "$MODPATH/action.sh" \
+  "$MODPATH/uninstall.sh" "$MODPATH/customize.sh" 2>/dev/null || true
+
 install_or_capture_package() {
   pkg="$1"
   dest="$2"
@@ -67,6 +72,8 @@ set_perm "$MODPATH/customize.sh" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
 set_perm "$MODPATH/action.sh" 0 0 0755
+chmod 0755 "$MODPATH/service.sh" "$MODPATH/action.sh" \
+  "$MODPATH/uninstall.sh" "$MODPATH/customize.sh" 2>/dev/null || true
 
 ui_print "- Configuration installed"
 ui_print "- Reboot once, then run the module action for status"
