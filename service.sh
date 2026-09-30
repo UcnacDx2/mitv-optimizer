@@ -134,9 +134,11 @@ enable_adb_tcp_after_boot() {
   port="$(read_option ADB_TCP_PORT)"
   sleep 15
   /system/bin/settings put global adb_enabled 1 2>/dev/null || true
-  /system/bin/resetprop service.adb.tcp.port "$port" 2>/dev/null || \
-    /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
-  log "ADB post-boot settings applied without restarting adbd"
+  /system/bin/setprop persist.adb.tcp.port "$port" 2>/dev/null || true
+  /system/bin/setprop service.adb.tcp.port "$port" 2>/dev/null || true
+  /system/bin/stop adbd 2>/dev/null || true
+  /system/bin/start adbd 2>/dev/null || true
+  log "ADB post-boot settings applied; adbd restarted synchronously"
 }
 
 if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
