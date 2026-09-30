@@ -25,12 +25,20 @@ run_retry_logged() {
   return 1
 }
 
-LOCK_DIR="$STATE_DIR/service.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  log "service skipped: another instance is active"
-  exit 0
+LOCK_FILE="$STATE_DIR/service.pid"
+if [ -f "$LOCK_FILE" ]; then
+  old_pid="$(cat "$LOCK_FILE" 2>/dev/null | tr -d '\r')"
+  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+    log "service skipped: another instance is active pid=$old_pid"
+    exit 0
+  fi
+  rm -f "$LOCK_FILE"
 fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+# Recover the directory lock left by older module versions after an interrupted
+# service run. It is no longer used as the lock primitive.
+rmdir "$STATE_DIR/service.lock" 2>/dev/null || true
+printf '%s\n' "$$" > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
 
 read_option() {
   local option_key option_value
@@ -128,17 +136,6 @@ while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 60 ]; do
 done
 sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
-
-monitor_adb_tcp() {
-  local port
-  port="$(read_option ADB_TCP_PORT)"
-  /system/bin/setsid /system/bin/nohup "$MODDIR/adb-monitor.sh" "$STATE_DIR" "$port" \
-    >/dev/null 2>&1 < /dev/null &
-}
-
-if [ "$(read_option ENABLE_ADB_TCP)" = "1" ]; then
-  monitor_adb_tcp &
-fi
 
 if [ "$(read_option DISABLE_AD_COMPONENTS)" = "1" ]; then
   components="$(sed '/^[[:space:]]*$/d' "$MODDIR/components-ad.txt")"
