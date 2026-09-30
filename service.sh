@@ -129,6 +129,72 @@ apply_setting() {
   fi
 }
 
+apply_adb() {
+  local port ready i listening adb_value
+  port="$(read_option ADB_PORT)"
+  [ -n "$port" ] || port=5555
+  setprop persist.adb.tcp.port "$port"
+  setprop service.adb.tcp.port "$port"
+  setprop sys.set_adb_disabled 1
+
+  # Wait for the Settings provider instead of sleeping a fixed amount. The
+  # Xiaomi boot receiver can otherwise overwrite adb_enabled during startup.
+  ready=0
+  i=0
+  while [ "$i" -lt 20 ]; do
+    adb_value="$(/system/bin/settings get global adb_enabled 2>/dev/null | tr -d '\r')"
+    case "$adb_value" in
+      0|1|null)
+      ready=1
+      break
+      ;;
+    esac
+    sleep 1
+    i=$((i + 1))
+  done
+  if [ "$ready" -eq 1 ]; then
+    sleep 5
+    /system/bin/settings put global adb_enabled 1
+    log "adb settings: enabled=$(/system/bin/settings get global adb_enabled 2>/dev/null) port=$port"
+  else
+    log "adb settings service not ready; watchdog will retry"
+  fi
+
+  setprop ctl.stop adbd
+  sleep 1
+  setprop ctl.start adbd
+
+  watchdog_pid_file="$STATE_DIR/adb-watchdog.pid"
+  if [ -f "$watchdog_pid_file" ] && kill -0 "$(cat "$watchdog_pid_file" 2>/dev/null)" 2>/dev/null; then
+    log "adb watchdog already active pid=$(cat "$watchdog_pid_file")"
+    return 0
+  fi
+
+  adb_watchdog() {
+    while true; do
+      listening=0
+      if command -v ss >/dev/null 2>&1; then
+        ss -lnt 2>/dev/null | grep -q ":$port " && listening=1
+      elif command -v netstat >/dev/null 2>&1; then
+        netstat -lnt 2>/dev/null | grep -q ":$port " && listening=1
+      fi
+      if [ "$listening" -eq 0 ]; then
+        /system/bin/settings put global adb_enabled 1 2>/dev/null || true
+        setprop persist.adb.tcp.port "$port"
+        setprop service.adb.tcp.port "$port"
+        setprop ctl.stop adbd
+        sleep 1
+        setprop ctl.start adbd
+        log "adb watchdog restarted adbd port=$port"
+      fi
+      sleep 30
+    done
+  }
+  adb_watchdog &
+  printf '%s\n' "$!" > "$watchdog_pid_file"
+  log "adb service configured: port=$port"
+}
+
 i=0
 while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 60 ]; do
   sleep 2
@@ -136,6 +202,10 @@ while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 60 ]; do
 done
 sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
+
+if [ "$(read_option ENABLE_ADB)" = "1" ]; then
+  apply_adb
+fi
 
 if [ "$(read_option DISABLE_AD_COMPONENTS)" = "1" ]; then
   components="$(sed '/^[[:space:]]*$/d' "$MODDIR/components-ad.txt")"

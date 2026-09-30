@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stage = Join-Path $env:TEMP ('mitv-optimizer-' + [guid]::NewGuid().ToString('N'))
-$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.1.0.zip' }
+$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.3.0.zip' }
 $zip = Join-Path $OutputDirectory $zipName
 
 if ([string]::IsNullOrWhiteSpace($Aapt)) {
@@ -74,13 +74,14 @@ try {
         if ([string]::IsNullOrWhiteSpace($artifact.Path) -or -not (Test-Path -LiteralPath $artifact.Path)) {
             throw "Missing required APK input: $($artifact.Name). Pass -$($artifact.Name -replace '\.apk$','') or provide the file."
         }
-        $destination = Join-Path $artifactDir $artifact.Name
-        Copy-Item -LiteralPath $artifact.Path -Destination $destination -Force
-        $hash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
+        # The APK is already included under system/. Keep only manifests here
+        # so each release does not ship both a system APK and a duplicate copy.
+        $sourcePath = $artifact.Path
+        $hash = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
         $manifestLines.Add("$($artifact.Name)`t$hash")
 
         if ($hasMetadataTools) {
-            $badging = @(& $Aapt dump badging $destination 2>&1)
+            $badging = @(& $Aapt dump badging $sourcePath 2>&1)
             if ($LASTEXITCODE -ne 0) { throw "aapt metadata validation failed: $($artifact.Name)" }
             $packageLine = $badging | Where-Object { $_ -match "^package: name='([^']+)' versionCode='([^']*)' versionName='([^']*)'" } | Select-Object -First 1
             if (-not $packageLine -or $packageLine -notmatch "^package: name='([^']+)' versionCode='([^']*)' versionName='([^']*)'") {
@@ -113,7 +114,7 @@ try {
         }
 
         if ($hasMetadataTools) {
-            $certOutput = @(& $ApkSigner verify --verbose --print-certs $destination 2>&1)
+            $certOutput = @(& $ApkSigner verify --verbose --print-certs $sourcePath 2>&1)
             if ($LASTEXITCODE -ne 0) { throw "APK signature validation failed: $($artifact.Name)`n$($certOutput -join "`n")" }
             $certificate = $certOutput | Where-Object { $_ -match 'certificate SHA-256 digest:' } | Select-Object -First 1
             if (-not $certificate -or $certificate -notmatch 'certificate SHA-256 digest:\s*([0-9A-Fa-f:]+)') {

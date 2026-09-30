@@ -3,6 +3,10 @@
 STATE_DIR=/data/adb/mitv-optimizer
 LOG_FILE=/data/adb/mitv-optimizer-uninstall.log
 : > "$LOG_FILE"
+if [ -f "$STATE_DIR/adb-watchdog.pid" ]; then
+  watchdog_pid="$(cat "$STATE_DIR/adb-watchdog.pid" 2>/dev/null | tr -d '\r')"
+  [ -n "$watchdog_pid" ] && kill "$watchdog_pid" 2>/dev/null || true
+fi
 TMP_DIR="/data/local/tmp/mitv-optimizer-restore-$$"
 mkdir -p "$TMP_DIR"
 chmod 0700 "$TMP_DIR"

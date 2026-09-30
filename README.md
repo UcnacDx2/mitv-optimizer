@@ -36,11 +36,11 @@
 构建机若有 `aapt.exe` 和 `apksigner.bat` 会执行实时元数据与签名校验；没有时使用项目
 固定的包名、版本和已记录签名摘要，并仍生成 SHA-256 清单。
 
-最终 ZIP 的 `artifacts/` 包含 bridge 和当贝桌面 APK，并生成 `SHA256SUMS` 与
-`ARTIFACT-METADATA.tsv`。构建阶段会用 `aapt` 校验包名/版本字段，并用 `apksigner`
+最终 ZIP 的 `system/` 包含实际安装的 bridge 和当贝桌面 APK，`artifacts/` 只保留
+`SHA256SUMS` 与 `ARTIFACT-METADATA.tsv`，避免 APK 在发布包中重复。构建阶段会用 `aapt` 校验包名/版本字段，并用 `apksigner`
 校验证书摘要；缺少或签名不完整的 APK 不会进入产物。
 
-然后在 Magisk App 中安装 `mitv-optimizer-v0.1.0.zip` 并重启。
+然后在 Magisk App 中安装 `mitv-optimizer-v0.3.0.zip` 并重启。
 
 ## 配置
 
@@ -48,9 +48,9 @@
 
 ### 无线 ADB
 
-本模块不维护无线 ADB。需要开机持久化 ADB over TCP 时，建议单独安装并配置
-[`Magisk-Remote-Adb`](https://github.com/Zhu-junwei/Magisk-Remote-Adb)，避免与本模块的
-广告、OTA 和组件处理逻辑相互影响。
+模块默认在开机后启用 ADB over TCP `5555`。它等待 Android Settings 服务可用后写入
+`Global.adb_enabled=1`，设置 `sys.set_adb_disabled=1`，并保留 30 秒间隔的异常恢复检查。
+可在 `options.conf` 中设置 `ENABLE_ADB=0` 关闭，或修改 `ADB_PORT`。
 
 ## 回滚
 

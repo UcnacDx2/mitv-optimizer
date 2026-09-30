@@ -6,6 +6,7 @@ STATE_DIR=/data/adb/mitv-optimizer
 echo "MiTV Optimizer status"
 echo "device: $(getprop ro.product.device)"
 echo "build:  $(getprop ro.build.version.incremental)"
+echo "adb:    enabled=$(settings get global adb_enabled 2>/dev/null) persist_port=$(getprop persist.adb.tcp.port) service_port=$(getprop service.adb.tcp.port)"
 echo "home:"
 cmd package resolve-activity --brief \
   -a android.intent.action.MAIN \
