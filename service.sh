@@ -274,6 +274,10 @@ FALLBACK_HOME_COMP="com.xiaomi.mitv.settings/.entry.FallbackHome"
 FALLBACK_HOME_PKG="com.xiaomi.mitv.settings"
 FALLBACK_HOME_CLASS="com.xiaomi.mitv.settings.entry.FallbackHome"
 BRIDGE_PACKAGE="com.ucnacdx2.mitvhomebridge"
+# The vendor Home. The bridge disables this component once a third-party Home is
+# confirmed, which is what the stuck-boot recovery below may have to undo.
+TVHOME_PACKAGE="com.mitv.tvhome"
+TVHOME_COMP="com.mitv.tvhome/com.mitv.tvhome.MainActivityUserMode"
 
 resolved_home() {
   /system/bin/cmd package resolve-activity --brief \
@@ -346,11 +350,70 @@ recover_missing_home() {
   return 0
 }
 
+boot_completed() {
+  [ "$(getprop sys.boot_completed)" = "1" ]
+}
+
+# True only when something deliberately turned the vendor Home off. The bridge
+# does that after confirming a third-party Home; nothing else does. The recovery
+# below must not resurrect a Home on a device whose vendor Home was never
+# disabled, or it would fight the user's own choice on every slow boot.
+vendor_home_off() {
+  [ "$(package_state "$TVHOME_PACKAGE")" = "disabled-user" ] && return 0
+  [ "$(component_state "$TVHOME_COMP")" = "disabled" ] && return 0
+  return 1
+}
+
+# With the vendor Home and FallbackHome both disabled this ROM stalls the boot,
+# and it stalls even while the third-party Home still resolves - so the guard
+# above, which only asks whether *a* Home resolves, never fires and the TV sits
+# on the boot animation forever. A device that cannot finish booting is worse
+# than one that kept a vendor component, so when sys.boot_completed never
+# arrives, put the vendor Home component back.
+#
+# The preferred Home is deliberately not touched: whatever the bridge selected
+# stays selected, and the third-party Home still owns the HOME intent. This only
+# returns a candidate the ROM apparently needs in order to finish booting.
+recover_stuck_boot() {
+  if ! vendor_home_off; then
+    log "boot guard: boot incomplete, vendor Home was never disabled; left alone"
+    return 0
+  fi
+  log "boot guard: boot incomplete and vendor Home disabled; restoring it"
+  run_retry_logged /system/bin/pm enable --user 0 "$TVHOME_PACKAGE"
+  if run_retry_logged /system/bin/pm enable --user 0 "$TVHOME_COMP"; then
+    log "boot guard: vendor Home component restored"
+  else
+    log "boot guard: could not restore vendor Home component"
+  fi
+  run_retry_logged /system/bin/pm enable --user 0 "$FALLBACK_HOME_COMP"
+
+  if boot_completed; then
+    log "boot guard: boot completed after vendor Home restore"
+    return 0
+  fi
+  # The ROM starts its Home from the boot flow. If it already gave up on that,
+  # start one by hand so the boot animation is replaced by an actual Home.
+  run_retry_logged /system/bin/am start --user 0 -a android.intent.action.MAIN \
+    -c android.intent.category.HOME
+  if boot_completed; then
+    log "boot guard: boot completed after starting Home"
+  else
+    log "boot guard: WARNING boot still incomplete after vendor Home restore"
+  fi
+}
+
+# 120s is the budget for a normal boot. Past it the boot is stuck rather than
+# slow, and the guard below needs to know which of the two it is looking at.
+BOOT_STUCK=0
 i=0
-while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 60 ]; do
+while ! boot_completed && [ "$i" -lt 60 ]; do
   sleep 2
   i=$((i + 1))
 done
+if ! boot_completed; then
+  BOOT_STUCK=1
+fi
 sleep 8
 log "service start: device=$(getprop ro.product.device) build=$(getprop ro.build.version.incremental)"
 
@@ -392,6 +455,9 @@ if [ "$(read_option DISABLE_INSTALLER_RESTRICTION)" = "1" ]; then
 fi
 
 if [ "$(read_option DISABLE_BOOT_HOME_GUARD)" != "1" ]; then
+  if [ "$BOOT_STUCK" -eq 1 ]; then
+    recover_stuck_boot
+  fi
   recover_missing_home
 fi
 
