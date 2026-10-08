@@ -195,6 +195,89 @@ apply_adb() {
   log "adb service configured: port=$port"
 }
 
+# FallbackHome is the ROM recovery launcher. The bridge disables it only after
+# it confirms a usable third-party Home. If the selected Home later goes missing
+# or gets disabled while the vendor Home stays disabled, nothing answers HOME
+# and the TV boots onto a black screen. This guard re-enables FallbackHome in
+# that one case so the device stays enterable. It only ever *enables* the
+# component, and only after HOME resolution has actually failed, so it cannot
+# override or fight a healthy Home.
+FALLBACK_HOME_COMP="com.xiaomi.mitv.settings/.entry.FallbackHome"
+FALLBACK_HOME_PKG="com.xiaomi.mitv.settings"
+FALLBACK_HOME_CLASS="com.xiaomi.mitv.settings.entry.FallbackHome"
+BRIDGE_PACKAGE="com.ucnacdx2.mitvhomebridge"
+
+resolved_home() {
+  /system/bin/cmd package resolve-activity --brief \
+    -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null | \
+    grep '/' | tail -n 1 | tr -d '\r'
+}
+
+home_ready() {
+  # Bounded re-check so a transient empty resolution during startup is not
+  # mistaken for a missing Home.
+  local attempt
+  attempt=0
+  while [ "$attempt" -lt 3 ]; do
+    [ -n "$(resolved_home)" ] && return 0
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+  [ -n "$(resolved_home)" ]
+}
+
+# Least-privileged first: this script already runs as root, so the plain command
+# normally succeeds. The verified TvService temporary-root path and su are only
+# reached if that somehow did not make HOME resolve again.
+enable_fallback_via_tvservice() {
+  local script_path
+  script_path="/sdcard/Download/mitv-optimizer-fallback.sh"
+  {
+    printf '%s\n' '#!/system/bin/sh'
+    printf '%s\n' 'export PATH=/system/bin:/system/xbin:$PATH'
+    printf '%s\n' "/system/bin/service call package 83 i32 1 s16 '$FALLBACK_HOME_PKG' s16 '$FALLBACK_HOME_CLASS' i32 1 i32 0 i32 0 s16 '$BRIDGE_PACKAGE'"
+  } > "$script_path" 2>/dev/null || return 1
+  chmod 0755 "$script_path" 2>/dev/null || true
+  /system/bin/service call TvService 4400 s16 s s16 "$script_path" >/dev/null 2>&1
+  rm -f "$script_path" 2>/dev/null || true
+  return 0
+}
+
+enable_fallback_via_su() {
+  command -v su >/dev/null 2>&1 || return 1
+  su -c "pm enable --user 0 $FALLBACK_HOME_COMP" >/dev/null 2>&1
+}
+
+recover_missing_home() {
+  log "boot guard: home=$(resolved_home)"
+  if home_ready; then
+    return 0
+  fi
+  log "boot guard: no HOME activity resolved; FallbackHome state=$(component_state "$FALLBACK_HOME_COMP")"
+
+  local recovered
+  recovered=0
+  if run_retry_logged /system/bin/pm enable --user 0 "$FALLBACK_HOME_COMP"; then
+    sleep 1
+    [ -n "$(resolved_home)" ] && recovered=1 && log "boot guard: FallbackHome enabled via pm"
+  fi
+  if [ "$recovered" -eq 0 ] && enable_fallback_via_tvservice; then
+    sleep 1
+    [ -n "$(resolved_home)" ] && recovered=1 && log "boot guard: FallbackHome enabled via TvService"
+  fi
+  if [ "$recovered" -eq 0 ] && enable_fallback_via_su; then
+    sleep 1
+    [ -n "$(resolved_home)" ] && recovered=1 && log "boot guard: FallbackHome enabled via su"
+  fi
+
+  if [ "$recovered" -eq 1 ]; then
+    log "boot guard: HOME recovered: $(resolved_home)"
+  else
+    log "boot guard: WARNING home still unresolved after FallbackHome recovery"
+  fi
+  return 0
+}
+
 i=0
 while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 60 ]; do
   sleep 2
@@ -234,6 +317,10 @@ if [ "$(read_option APPLY_AD_SETTINGS)" = "1" ]; then
   apply_setting system boot_ad_switch 0
   apply_setting system personalized_ad 0
   apply_setting system personalized_recommendation 0
+fi
+
+if [ "$(read_option DISABLE_BOOT_HOME_GUARD)" != "1" ]; then
+  recover_missing_home
 fi
 
 log "service complete: Home ownership remains with mitv-home-bridge"

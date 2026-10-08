@@ -11,6 +11,7 @@
 - 禁用小米电视 OTA 更新包 `com.xiaomi.mitv.upgrade`。
 - 禁用经 Manifest 与反编译代码确认的桌面广告组件。
 - 单独禁用 `FallbackHome`；默认不禁用原厂 `MainActivityUserMode`。
+- 开机后检测 HOME 解析：若某一时刻没有任何可解析的 Home（例如所选的第三方桌面缺失或已被禁用而原厂 Home 又处于禁用），自动重新启用 `FallbackHome`，避免电视停在无桌面状态。
 - 保存变更前状态，卸载模块时按记录恢复。
 
 ## 安全设计
@@ -21,6 +22,8 @@
 时安装会中止。
 
 `FallbackHome` 只有在系统实际解析到当贝 Home 后才会禁用。如果当贝 Home 不可用，安全闸会跳过所有 Home 组件变更并写入日志。
+
+开机守护只做一件事：当没有任何 Home 可解析时重新启用 `FallbackHome`。它只启用、从不禁用该组件，且只在解析失败后执行，因此不会影响正常开机的 Home。所有步骤都有次数上限、幂等，并在任一步失败时保留设备原有可启动状态。可在 `options.conf` 设置 `DISABLE_BOOT_HOME_GUARD=1` 关闭。
 
 ## 安装前置
 
