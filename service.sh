@@ -25,19 +25,39 @@ run_retry_logged() {
   return 1
 }
 
+current_boot_id() {
+  cat /proc/sys/kernel/random/boot_id 2>/dev/null | tr -d '\r'
+}
+
+# PID files live in STATE_DIR, which survives reboots, while the PIDs they hold do
+# not: the kernel reuses low numbers after a reboot, so a stored PID can name an
+# unrelated process and a bare liveness check would report the work as already
+# running. That silently skipped the whole service on the boot after an
+# interrupted run, so every lock is tagged with the boot id it was taken in and a
+# lock from an earlier boot is always treated as stale.
+lock_is_live() {
+  local lock_file old_boot old_pid boot
+  lock_file="$1"
+  boot="$(current_boot_id)"
+  [ -f "$lock_file" ] || return 1
+  read -r old_boot old_pid < "$lock_file" 2>/dev/null
+  [ -n "$old_pid" ] || return 1
+  # Without a boot id the lock cannot be scoped to this boot; assume stale rather
+  # than skip work that should run.
+  [ -n "$boot" ] && [ "$old_boot" = "$boot" ] || return 1
+  kill -0 "$old_pid" 2>/dev/null
+}
+
 LOCK_FILE="$STATE_DIR/service.pid"
-if [ -f "$LOCK_FILE" ]; then
-  old_pid="$(cat "$LOCK_FILE" 2>/dev/null | tr -d '\r')"
-  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-    log "service skipped: another instance is active pid=$old_pid"
-    exit 0
-  fi
-  rm -f "$LOCK_FILE"
+if lock_is_live "$LOCK_FILE"; then
+  log "service skipped: another instance is active pid=$(cut -d' ' -f2 "$LOCK_FILE" 2>/dev/null)"
+  exit 0
 fi
+rm -f "$LOCK_FILE"
 # Recover the directory lock left by older module versions after an interrupted
 # service run. It is no longer used as the lock primitive.
 rmdir "$STATE_DIR/service.lock" 2>/dev/null || true
-printf '%s\n' "$$" > "$LOCK_FILE"
+printf '%s %s\n' "$(current_boot_id)" "$$" > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
 read_option() {
@@ -212,10 +232,11 @@ apply_adb() {
   setprop ctl.start adbd
 
   watchdog_pid_file="$STATE_DIR/adb-watchdog.pid"
-  if [ -f "$watchdog_pid_file" ] && kill -0 "$(cat "$watchdog_pid_file" 2>/dev/null)" 2>/dev/null; then
-    log "adb watchdog already active pid=$(cat "$watchdog_pid_file")"
+  if lock_is_live "$watchdog_pid_file"; then
+    log "adb watchdog already active pid=$(cut -d' ' -f2 "$watchdog_pid_file" 2>/dev/null)"
     return 0
   fi
+  rm -f "$watchdog_pid_file"
 
   adb_watchdog() {
     while true; do
@@ -238,7 +259,7 @@ apply_adb() {
     done
   }
   adb_watchdog &
-  printf '%s\n' "$!" > "$watchdog_pid_file"
+  printf '%s %s\n' "$(current_boot_id)" "$!" > "$watchdog_pid_file"
   log "adb service configured: port=$port"
 }
 

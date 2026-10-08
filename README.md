@@ -5,22 +5,18 @@
 ## 功能
 
 - 合并并挂载电视广告域名 hosts。
-- 将已安装的当贝桌面系统化，并设为首选 Home。
-- 将当贝桌面中的系统设置入口指向电视已有的 `com.example.tvsettingslauncher`。
+- 把当贝桌面 APK 放到 `system/app/`，使其成为系统应用。**模块不设置首选 Home**；选桌面要打开 bridge 应用自己完成。
 - 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径并保留回退，同时在应用内完成第三方桌面安全闸。
 - 禁用小米电视 OTA 更新包 `com.xiaomi.mitv.upgrade`。
 - 解除安装器限制：拒绝 `com.android.packageinstaller` 的 `WRITE_SETTINGS` appop，并清空 / 重写 `system/pi_config`，使安装器无法再按厂商白名单拦截安装。
 - 禁用经 Manifest 与反编译代码确认的桌面广告组件。
-- 单独禁用 `FallbackHome`；默认不禁用原厂 `MainActivityUserMode`。
+- 不主动禁用任何 Home。`FallbackHome` 的禁用由 bridge 应用在确认第三方桌面可用后执行；模块只在 HOME 解析失败时把它重新启用。
 - 开机后检测 HOME 解析：若某一时刻没有任何可解析的 Home（例如所选的第三方桌面缺失或已被禁用而原厂 Home 又处于禁用），自动重新启用 `FallbackHome`，避免电视停在无桌面状态。
 - 保存变更前状态，卸载模块时按记录恢复。
 
 ## 安全设计
 
-本项目允许并要求在构建产物中直接分发 bridge 和当贝桌面 APK。安装时优先使用
-`artifacts/` 内置、已校验包名和签名摘要的 APK，形成 systemless system app；只有在
-内置文件缺失时才从电视上已经安装的包中捕获对应 APK 作为兼容回退。缺少任一必需应用
-时安装会中止。
+构建产物直接携带 bridge 和当贝桌面 APK，放在 `system/app/`，由 Magisk 以 systemless 方式挂载成系统应用——不是安装时从电视上抓包。构建阶段会用 `aapt` 校验包名与版本、用 `apksigner` 校验签名摘要，任一 APK 缺失或校验不过就中止构建。
 
 `FallbackHome` 只有在系统实际解析到当贝 Home 后才会禁用。如果当贝 Home 不可用，安全闸会跳过所有 Home 组件变更并写入日志。
 
