@@ -6,7 +6,7 @@
 
 - 合并并挂载电视广告域名 hosts。
 - 把当贝桌面 APK 放到 `system/app/`，使其成为系统应用。**模块不设置首选 Home**；选桌面要打开 bridge 应用自己完成。
-- 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径并保留回退，同时在应用内完成第三方桌面安全闸。
+- 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径并以 `su` 为唯一回退，同时在应用内完成第三方桌面安全闸。
 - 禁用小米电视 OTA 更新包 `com.xiaomi.mitv.upgrade`。
 - 解除安装器限制：拒绝 `com.android.packageinstaller` 的 `WRITE_SETTINGS` appop，并清空 / 重写 `system/pi_config`，使安装器无法再按厂商白名单拦截安装。
 - 禁用经 Manifest 与反编译代码确认的桌面广告组件。
@@ -67,6 +67,12 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 
 这一步由模块在开机时以 root 执行，不需要打开任何应用。集成在模块内的 bridge APK 也走同一
 序列，但它只通过 `su`，且仅在用户主动打开它时运行；设备没有 su 时整段跳过。
+
+这四条命令在 TvService 域中无法执行，2026-10-08 实测：`/system/bin/settings`、`appops`、`am`
+只是调用 `cmd` 的包装脚本（分别 35/33/207 字节），在该域里 exec 不到 `cmd`，全部 `rc=127`；
+改用绝对路径调用 `cmd`，服务侧拒绝 shell-command 通道，回 `Failed transaction (2147483646)`。
+脚本进程本身是 `uid=0` / `u:r:misysdiagnose:s0`，能力掩码完整，所以这不是权限问题。因此这里
+没有第二条链路，也不需要。
 
 ### 无线 ADB
 
