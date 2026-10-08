@@ -108,11 +108,11 @@ try {
                 'com.dangbei1.tvlauncherx.apk' { 'com.dangbei1.tvlauncherx' }
             }
             $versionCode = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '4' }
+                'mitv-home-bridge.apk' { '5' }
                 'com.dangbei1.tvlauncherx.apk' { '83' }
             }
             $versionName = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '0.3.1' }
+                'mitv-home-bridge.apk' { '0.3.2' }
                 'com.dangbei1.tvlauncherx.apk' { '3.3.6' }
             }
             Write-Warning "Android Build Tools unavailable; using pinned metadata for $($artifact.Name)."
