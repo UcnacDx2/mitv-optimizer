@@ -11,7 +11,7 @@ TMP_DIR="/data/local/tmp/mitv-optimizer-restore-$$"
 mkdir -p "$TMP_DIR"
 chmod 0700 "$TMP_DIR"
 
-for state_file in components.tsv packages.tsv settings.tsv; do
+for state_file in components.tsv packages.tsv settings.tsv appops.tsv; do
   if [ -f "$STATE_DIR/$state_file" ]; then
     cp -f "$STATE_DIR/$state_file" "$TMP_DIR/$state_file"
   fi
@@ -64,6 +64,13 @@ if [ -f "$TMP_DIR/settings.tsv" ]; then
       run_logged /system/bin/settings put "$namespace" "$key" "$value"
     fi
   done < "$TMP_DIR/settings.tsv"
+fi
+
+if [ -f "$TMP_DIR/appops.tsv" ]; then
+  while IFS='|' read -r pkg op mode; do
+    [ -n "$pkg" ] && [ -n "$op" ] && [ -n "$mode" ] || continue
+    run_logged /system/bin/cmd appops set --user 0 "$pkg" "$op" "$mode"
+  done < "$TMP_DIR/appops.tsv"
 fi
 
 if [ -s "$STATE_DIR/home.before" ]; then

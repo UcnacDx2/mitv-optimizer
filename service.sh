@@ -116,6 +116,20 @@ snapshot_setting() {
   printf '%s|%s|%s\n' "$snapshot_namespace" "$snapshot_key" "$old_value" >> "$STATE_DIR/settings.tsv"
 }
 
+snapshot_appop() {
+  local snapshot_package snapshot_op current_mode
+  snapshot_package="$1"
+  snapshot_op="$2"
+  [ -f "$STATE_DIR/appops.tsv" ] || : > "$STATE_DIR/appops.tsv"
+  grep -Fq "${snapshot_package}|${snapshot_op}|" "$STATE_DIR/appops.tsv" 2>/dev/null && return
+  # An op left at its default is dropped from the listing entirely, so an empty
+  # parse means "default" rather than "unknown".
+  current_mode="$(/system/bin/cmd appops get --user 0 "$snapshot_package" "$snapshot_op" 2>/dev/null | \
+    sed -n "s/^${snapshot_op}: //p" | head -n 1 | tr -d '\r')"
+  [ -n "$current_mode" ] || current_mode="default"
+  printf '%s|%s|%s\n' "$snapshot_package" "$snapshot_op" "$current_mode" >> "$STATE_DIR/appops.tsv"
+}
+
 apply_setting() {
   local target_namespace target_key target_value
   target_namespace="$1"
@@ -127,6 +141,39 @@ apply_setting() {
   else
     log "setting failed: $target_namespace/$target_key=$target_value"
   fi
+}
+
+# The package installer refuses to install packages the vendor ROM has not
+# approved, and it enforces that by rewriting system settings through its
+# WRITE_SETTINGS appop. Removing that appop leaves the installer without the
+# capability, and clearing pi_config drops the approval list it wrote. This needs
+# root: the appop belongs to another package, so a non-privileged caller cannot
+# change it, and `settings --user 0` additionally needs MANAGE_USERS. The bridge
+# app runs the same sequence through su, but only when the user opens it; here it
+# applies on every boot without that.
+INSTALLER_PACKAGE="com.android.packageinstaller"
+PI_CONFIG_KEY="pi_config"
+PI_CONFIG_VALUE='{"pi_intercept_switch":false,"app_pi_control":false}'
+
+remove_installer_restriction() {
+  snapshot_appop "$INSTALLER_PACKAGE" WRITE_SETTINGS
+  if run_retry_logged /system/bin/cmd appops set --user 0 "$INSTALLER_PACKAGE" WRITE_SETTINGS deny; then
+    log "installer restriction: WRITE_SETTINGS deny applied"
+  else
+    log "installer restriction: could not deny WRITE_SETTINGS"
+  fi
+
+  snapshot_setting system "$PI_CONFIG_KEY"
+  # Delete before the put so a stale value cannot survive a rejected write.
+  run_retry_logged /system/bin/settings delete system "$PI_CONFIG_KEY"
+  if run_retry_logged /system/bin/settings put system "$PI_CONFIG_KEY" "$PI_CONFIG_VALUE"; then
+    log "installer restriction: pi_config=$(/system/bin/settings get system "$PI_CONFIG_KEY" 2>/dev/null | tr -d '\r')"
+  else
+    log "installer restriction: could not write pi_config"
+  fi
+
+  run_retry_logged /system/bin/am force-stop --user 0 "$INSTALLER_PACKAGE"
+  log "installer restriction applied: appop=$(/system/bin/cmd appops get --user 0 "$INSTALLER_PACKAGE" WRITE_SETTINGS 2>/dev/null | tr '\n' ' ')"
 }
 
 apply_adb() {
@@ -317,6 +364,10 @@ if [ "$(read_option APPLY_AD_SETTINGS)" = "1" ]; then
   apply_setting system boot_ad_switch 0
   apply_setting system personalized_ad 0
   apply_setting system personalized_recommendation 0
+fi
+
+if [ "$(read_option DISABLE_INSTALLER_RESTRICTION)" = "1" ]; then
+  remove_installer_restriction
 fi
 
 if [ "$(read_option DISABLE_BOOT_HOME_GUARD)" != "1" ]; then

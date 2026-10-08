@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stage = Join-Path $env:TEMP ('mitv-optimizer-' + [guid]::NewGuid().ToString('N'))
-$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.3.0.zip' }
+$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.3.1.zip' }
 $zip = Join-Path $OutputDirectory $zipName
 
 if ([string]::IsNullOrWhiteSpace($Aapt)) {
@@ -62,6 +62,18 @@ try {
         }
     }
 
+    # These scripts run under the device's busybox/mksh, where a CR before the
+    # newline makes `case ... in` and `for ... do` unparseable and silently
+    # kills the whole service. A Windows checkout with core.autocrlf=true would
+    # otherwise ship exactly that, so normalize what actually gets zipped.
+    $textExtensions = @('.sh', '.prop', '.conf', '.txt')
+    Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+        ($textExtensions -contains $_.Extension.ToLowerInvariant()) -or ($_.Name -eq 'hosts')
+    } | ForEach-Object {
+        $text = [System.IO.File]::ReadAllText($_.FullName).Replace("`r`n", "`n").Replace("`r", "`n")
+        [System.IO.File]::WriteAllText($_.FullName, $text)
+    }
+
     $artifactInputs = if ($Poc) { @() } else { @(
         @{ Name = 'mitv-home-bridge.apk'; Path = $BridgeApk },
         @{ Name = 'com.dangbei1.tvlauncherx.apk'; Path = $DangbeiApk }
@@ -96,11 +108,11 @@ try {
                 'com.dangbei1.tvlauncherx.apk' { 'com.dangbei1.tvlauncherx' }
             }
             $versionCode = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '2' }
+                'mitv-home-bridge.apk' { '4' }
                 'com.dangbei1.tvlauncherx.apk' { '83' }
             }
             $versionName = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '0.2.0' }
+                'mitv-home-bridge.apk' { '0.3.1' }
                 'com.dangbei1.tvlauncherx.apk' { '3.3.6' }
             }
             Write-Warning "Android Build Tools unavailable; using pinned metadata for $($artifact.Name)."

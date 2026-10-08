@@ -1,0 +1,6 @@
+# Module shell scripts run under the device's busybox/mksh. CRLF makes
+# `case ... in` and `for ... do` unparseable, so the module's service never ran
+# when the ZIP was built from a Windows checkout with core.autocrlf=true.
+* text=auto eol=lf
+*.apk binary
+*.png binary

@@ -9,6 +9,7 @@
 - 将当贝桌面中的系统设置入口指向电视已有的 `com.example.tvsettingslauncher`。
 - 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径并保留回退，同时在应用内完成第三方桌面安全闸。
 - 禁用小米电视 OTA 更新包 `com.xiaomi.mitv.upgrade`。
+- 解除安装器限制：拒绝 `com.android.packageinstaller` 的 `WRITE_SETTINGS` appop，并清空 / 重写 `system/pi_config`，使安装器无法再按厂商白名单拦截安装。
 - 禁用经 Manifest 与反编译代码确认的桌面广告组件。
 - 单独禁用 `FallbackHome`；默认不禁用原厂 `MainActivityUserMode`。
 - 开机后检测 HOME 解析：若某一时刻没有任何可解析的 Home（例如所选的第三方桌面缺失或已被禁用而原厂 Home 又处于禁用），自动重新启用 `FallbackHome`，避免电视停在无桌面状态。
@@ -29,12 +30,18 @@
 
 构建时必须提供以下 APK 本体：
 
-- `com.dangbei1.tvlauncher`
+- `com.dangbei1.tvlauncherx`
 - `com.ucnacdx2.mitvhomebridge`
 
 ```powershell
-.\scripts\build.ps1 -DangbeiApk .\path\com.dangbei1.tvlauncher.apk
+.\scripts\build.ps1 -DangbeiApk .\path\com.dangbei1.tvlauncherx.apk
 ```
+
+两个 APK 都放进 `system/app/`，**不要**放进 `system/priv-app/`。本 ROM 的
+`ro.control_privapp_permissions=enforce` 会在开机扫描时校验 priv-app 的
+`signature|privileged` 权限白名单，而这两个 APK 都是 debug key 重签的第三方应用、不在任何
+白名单里，放进去会让 PackageManagerService 抛致命异常并卡在开机动画。放 `system/app/`
+则只会静默丢掉那些特权权限，作为桌面需要的普通权限不受影响。
 
 构建机若有 `aapt.exe` 和 `apksigner.bat` 会执行实时元数据与签名校验；没有时使用项目
 固定的包名、版本和已记录签名摘要，并仍生成 SHA-256 清单。
@@ -43,11 +50,20 @@
 `SHA256SUMS` 与 `ARTIFACT-METADATA.tsv`，避免 APK 在发布包中重复。构建阶段会用 `aapt` 校验包名/版本字段，并用 `apksigner`
 校验证书摘要；缺少或签名不完整的 APK 不会进入产物。
 
-然后在 Magisk App 中安装 `mitv-optimizer-v0.3.0.zip` 并重启。
+然后在 Magisk App 中安装 `mitv-optimizer-v0.3.1.zip` 并重启。
 
 ## 配置
 
 功能开关位于 `options.conf`。默认仅禁用 `FallbackHome`，不禁用原厂主 Home。修改后重启生效。
+
+### 安装器限制
+
+`DISABLE_INSTALLER_RESTRICTION=1`（默认开启）在开机后以 root 执行：拒掉
+`com.android.packageinstaller` 的 `WRITE_SETTINGS` appop、删除并重写 `system/pi_config`、
+最后 `force-stop` 安装器。若 `pi_config` 或 appop 被 ROM 拒绝写入，日志会记录实际回读值。
+
+这一步由模块在开机时以 root 执行，不需要打开任何应用。集成在模块内的 bridge APK 也走同一
+序列，但它只通过 `su`，且仅在用户主动打开它时运行；设备没有 su 时整段跳过。
 
 ### 无线 ADB
 
@@ -57,7 +73,7 @@
 
 ## 回滚
 
-优先从 Magisk App 禁用模块并重启。确认电视恢复后再卸载。卸载脚本会恢复记录到的组件、OTA 包、广告设置和原 Home。
+优先从 Magisk App 禁用模块并重启。确认电视恢复后再卸载。卸载脚本会恢复记录到的组件、OTA 包、广告设置、appop 模式和原 Home。
 
 详见 [恢复说明](docs/RECOVERY.md) 和 [组件依据](docs/COMPONENTS.md)。
 
