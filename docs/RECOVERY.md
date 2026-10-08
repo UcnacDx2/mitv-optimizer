@@ -37,8 +37,10 @@ su -c 'settings put system pi_config "<settings.tsv 里的值>"'
 su -c 'cmd appops set --user 0 com.android.packageinstaller WRITE_SETTINGS allow'
 ```
 
-这两条都必须有 root：该 appop 属于别的包，`settings` / `cmd` 加 `--user 0` 还需要额外权限，
-普通 adb shell 改不动。正常卸载模块时 `uninstall.sh` 会读这两个文件自动回滚，不需要手动做。
+这两条都不需要 root：2026-10-08 在 finch 上以 `uid=2000(shell)` 的普通 adb shell 实测，
+`settings --user 0 put system pi_config` 与 `cmd appops set --user 0 com.android.packageinstaller
+WRITE_SETTINGS allow` 都能生效（后者改完回读为 `allow`，再改回 `deny` 回读一致）。正常卸载
+模块时 `uninstall.sh` 会读这两个文件自动回滚，不需要手动做。
 
 ## 第三方桌面异常但系统仍运行
 
