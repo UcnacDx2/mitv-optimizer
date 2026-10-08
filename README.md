@@ -69,6 +69,17 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 序列，且只在用户主动打开它时运行：有 root 时四条一次做完，没有 root 时用 TvService 域内的
 原生调用完成 appop 与 force-stop 两步，`pi_config` 那一步跳过。
 
+`pi_config` 由厂商经 `appstore-upgrade.tv.mi.com` 下发，里面带一份来源黑名单列表；本机上
+模块改动它之前它是 `null`（原本没有这一项），说明 vendor 缺省下拦截是开着的，只删不写回
+并不等于解除。没装本模块、也没有 root 时，这一步没有工具替用户做，需要用户自己在 adb shell
+里补——普通 adb shell 即可，不需要 root（2026-10-08 在 finch 上实测）：
+
+```sh
+adb shell settings --user 0 put system pi_config '{"pi_intercept_switch":false,"app_pi_control":false}'
+```
+
+详情见 bridge 仓库的「没有 root 时手动清 pi_config」一节。
+
 这四条命令**不能按原样**在 TvService 域中执行，2026-10-08 实测：`/system/bin/settings`、`appops`、
 `am` 只是调用 `cmd` 的包装脚本（分别 35/33/207 字节），在该域里 exec 不到 `cmd`，全部 `rc=127`；
 改用绝对路径调用 `cmd`，服务侧拒绝 shell-command 通道，回 `Failed transaction (2147483646)`。
