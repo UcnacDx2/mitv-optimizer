@@ -6,7 +6,7 @@
 
 - 合并并挂载电视广告域名 hosts。
 - 把当贝桌面 APK 放到 `system/app/`，使其成为系统应用。**模块不设置首选 Home**；选桌面要打开 bridge 应用自己完成。
-- 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径并以 `su` 为唯一回退，同时在应用内完成第三方桌面安全闸。
+- 集成独立仓库 `mitv-home-bridge` 的 APK。目标 ROM 已通过 PoC 验证 `TvService` 临时 Root 链路可执行 PackageManager 操作；bridge 使用该路径、以 `su` 为回退，并在应用内完成第三方桌面安全闸。安装器限制里能走原生调用的两步（appop、force-stop）在 bridge 上也有不依赖 su 的路径。
 - 禁用小米电视 OTA 更新包 `com.xiaomi.mitv.upgrade`。
 - 解除安装器限制：拒绝 `com.android.packageinstaller` 的 `WRITE_SETTINGS` appop，并清空 / 重写 `system/pi_config`，使安装器无法再按厂商白名单拦截安装。
 - 禁用经 Manifest 与反编译代码确认的桌面广告组件。
@@ -53,7 +53,7 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 `SHA256SUMS` 与 `ARTIFACT-METADATA.tsv`，避免 APK 在发布包中重复。构建阶段会用 `aapt` 校验包名/版本字段，并用 `apksigner`
 校验证书摘要；缺少或签名不完整的 APK 不会进入产物。
 
-然后在 Magisk App 中安装 `mitv-optimizer-v0.3.2.zip` 并重启。
+然后在 Magisk App 中安装 `mitv-optimizer-v0.3.3.zip` 并重启。
 
 ## 配置
 
@@ -66,7 +66,8 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 最后 `force-stop` 安装器。若 `pi_config` 或 appop 被 ROM 拒绝写入，日志会记录实际回读值。
 
 这一步由模块在开机时以 root 执行，不需要打开任何应用。集成在模块内的 bridge APK 也走同一
-序列，但它只通过 `su`，且仅在用户主动打开它时运行；设备没有 su 时整段跳过。
+序列，且只在用户主动打开它时运行：有 root 时四条一次做完，没有 root 时用 TvService 域内的
+原生调用完成 appop 与 force-stop 两步，`pi_config` 那一步跳过。
 
 这四条命令**不能按原样**在 TvService 域中执行，2026-10-08 实测：`/system/bin/settings`、`appops`、
 `am` 只是调用 `cmd` 的包装脚本（分别 35/33/207 字节），在该域里 exec 不到 `cmd`，全部 `rc=127`；

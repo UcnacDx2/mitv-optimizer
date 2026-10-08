@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stage = Join-Path $env:TEMP ('mitv-optimizer-' + [guid]::NewGuid().ToString('N'))
-$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.3.2.zip' }
+$zipName = if ($Poc) { 'mitv-optimizer-poc.zip' } else { 'mitv-optimizer-v0.3.3.zip' }
 $zip = Join-Path $OutputDirectory $zipName
 
 if ([string]::IsNullOrWhiteSpace($Aapt)) {
@@ -108,11 +108,11 @@ try {
                 'com.dangbei1.tvlauncherx.apk' { 'com.dangbei1.tvlauncherx' }
             }
             $versionCode = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '6' }
+                'mitv-home-bridge.apk' { '7' }
                 'com.dangbei1.tvlauncherx.apk' { '83' }
             }
             $versionName = switch ($artifact.Name) {
-                'mitv-home-bridge.apk' { '0.3.3' }
+                'mitv-home-bridge.apk' { '0.3.4' }
                 'com.dangbei1.tvlauncherx.apk' { '3.3.6' }
             }
             Write-Warning "Android Build Tools unavailable; using pinned metadata for $($artifact.Name)."
