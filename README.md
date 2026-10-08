@@ -53,7 +53,7 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 `SHA256SUMS` 与 `ARTIFACT-METADATA.tsv`，避免 APK 在发布包中重复。构建阶段会用 `aapt` 校验包名/版本字段，并用 `apksigner`
 校验证书摘要；缺少或签名不完整的 APK 不会进入产物。
 
-然后在 Magisk App 中安装 `mitv-optimizer-v0.3.1.zip` 并重启。
+然后在 Magisk App 中安装 `mitv-optimizer-v0.3.2.zip` 并重启。
 
 ## 配置
 
