@@ -1,6 +1,6 @@
 id=mitv-optimizer
 name=MiTV Optimizer
-version=v0.3.3
-versionCode=33
+version=v0.3.4
+versionCode=34
 author=UcnacDx2
 description=Systemless MiTV launcher integration, OTA/ad controls, hosts filtering, and Android TV settings entry
