@@ -68,11 +68,25 @@ HOME 的默认处理者。所有步骤都有次数上限、幂等，并在任一
 这一步由模块在开机时以 root 执行，不需要打开任何应用。集成在模块内的 bridge APK 也走同一
 序列，但它只通过 `su`，且仅在用户主动打开它时运行；设备没有 su 时整段跳过。
 
-这四条命令在 TvService 域中无法执行，2026-10-08 实测：`/system/bin/settings`、`appops`、`am`
-只是调用 `cmd` 的包装脚本（分别 35/33/207 字节），在该域里 exec 不到 `cmd`，全部 `rc=127`；
+这四条命令**不能按原样**在 TvService 域中执行，2026-10-08 实测：`/system/bin/settings`、`appops`、
+`am` 只是调用 `cmd` 的包装脚本（分别 35/33/207 字节），在该域里 exec 不到 `cmd`，全部 `rc=127`；
 改用绝对路径调用 `cmd`，服务侧拒绝 shell-command 通道，回 `Failed transaction (2147483646)`。
-脚本进程本身是 `uid=0` / `u:r:misysdiagnose:s0`，能力掩码完整，所以这不是权限问题。因此这里
-没有第二条链路，也不需要。
+
+但这不等于四条都做不到。脚本进程是 `uid=0` / `u:r:misysdiagnose:s0`，能力掩码完整，`service call`
+可以直接打到服务上，其中两条已实测走通：
+
+- 改 appop：`service call appops 31 i32 <op 号> i32 <uid> s16 <包名> i32 <mode>`。实测把
+  `com.android.packageinstaller` 的 `WRITE_SETTINGS`（op 23）改成 `allow` 再改回，宿主回读一致。
+  注意 `cmd appops set … deny` 对应 mode `2`，`1` 是 `ignore`。
+- force-stop：`service call activity 83 s16 <包名> i32 0` 即 `forceStopPackage`，实测目标进程被杀、
+  无异常返回。
+
+`pi_config` 的读写没有这样的入口：它要经过 settings provider，而 `service call` 取不到 `settings`
+这个服务（描述符为空、报 `Service settings does not exist`，但 `service check` 报 found），该域里
+`app_process` 也被 SELinux 拒绝执行、没法自己拼 Parcel，所以只有这一步没有第二条链路。
+
+模块不使用这些原生调用：硬编码 transaction 号会随 ROM 漂移，开机时有真 root，原命令更稳妥。
+这里记录它们只是为了说明"做不到"的边界在哪。
 
 ### 无线 ADB
 
